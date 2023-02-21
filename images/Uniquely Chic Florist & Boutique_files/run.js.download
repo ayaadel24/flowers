@@ -1,0 +1,119 @@
+(function () {
+  const app = {
+    AccessibilityWidget: null,
+    Host: "https://shopify.accessiblyapp.com",
+    // Host: "https://staging.accessibly.app",
+    Routes: {
+      Settings: "/api/shop/options/",
+    },
+    Settings: {},
+    Name: "OTMAccessibilityWidget",
+    Run: function () {
+      //Get the *.myshopify.com domain
+      var shop = Shopify.shop;
+      //Load the store owner's widget settings
+      app.LoadSettings(shop, function (settings) {
+        //Get settings from settings_data.json
+
+        if (window.AccessiblyOptions) {
+          if (settings.subscription_active) {
+            settings.themeColor = window.AccessiblyOptions.themeColor;
+            settings.iconColor = window.AccessiblyOptions.iconColor;
+            settings.iconCustomSize = window.AccessiblyOptions.iconCustomSize;
+            settings.showLogo = window.AccessiblyOptions.showLogo === "true";
+            settings.iconSize = window.AccessiblyOptions.iconSize;
+          }
+
+          settings.position = window.AccessiblyOptions.position;
+          settings.topBottomPosition =
+            window.AccessiblyOptions.topBottomPosition;
+          settings.rightLeftPosition =
+            window.AccessiblyOptions.rightLeftPosition;
+        }
+
+        settings.enabled = true;
+        //Save app settings
+        app.Settings = settings;
+
+        //Append Accessibility Widget
+        app.AppendAccessibilityWidget(function () {
+          //Configure Accessibility Widget
+          app.AccessibilityWidget = app.ConfigurePlugin(app.Settings);
+        });
+      });
+    },
+    Request: function (url, type, data = null) {
+      return new Promise(function (resolve, reject) {
+        const xhr = new XMLHttpRequest();
+
+        xhr.open(type, url);
+
+        if (type === "POST") {
+          xhr.setRequestHeader(
+            "Content-Type",
+            "application/x-www-form-urlencoded"
+          );
+        }
+
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.response));
+          } else {
+            reject("The request failed!");
+          }
+        };
+
+        xhr.send(data);
+      });
+    },
+    Get: function (url) {
+      return app.Request(url, "GET");
+    },
+    Post: function (url) {
+      return app.Request(url, "POST");
+    },
+    LoadSettings: function (shop, callback) {
+      //Prepare a function to handle when the settings are loaded.
+      const settingsLoaded = function (settings) {
+        //Return the settings to the Start function so it can continue loading.
+        callback(settings);
+      };
+
+      //Load the settings
+      const settingsUrl = app.Host + app.Routes.Settings;
+
+      app
+        .Get(settingsUrl + "?shop=" + shop + "&url=" + window.location.href)
+        .then(settingsLoaded)
+        .catch(function (err) {
+          console.error("Something wen't wrong. %s", err);
+        });
+    },
+    AppendAccessibilityWidget: function (callback) {
+      //Build the script element
+      const scriptSrc =
+        "https://cdn.accessibly.app/accessibility-widget-v2.min.js";
+      if (!document.querySelectorAll('[src="' + scriptSrc + '"]').length > 0) {
+        var script = document.createElement("script");
+        script.src = scriptSrc;
+        script.async = true;
+        script.type = "text/javascript";
+
+        script.onload = callback;
+        document.body.appendChild(script);
+      }
+    },
+    ConfigurePlugin: function (settings) {
+      Accessibly.init(settings);
+    },
+  };
+
+  if (typeof window["OTMAccessibilityWidget"] !== "undefined") {
+    return;
+  }
+
+  app.Run();
+
+  //Just for testing
+  window["OTMAccessibilityWidget"] = app;
+})();
